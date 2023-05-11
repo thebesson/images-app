@@ -1,13 +1,19 @@
-import React, { ChangeEvent, useState } from 'react';
+import React, { ChangeEvent } from 'react';
 import './App.css';
 import AddButton from './components/AddButton';
 import loadImage, { LoadImageResult } from 'blueimp-load-image';
 import { API_KEY, API_URL, BASE64_IMAGE_HEADER } from './Constants';
+import { useLocalStorage } from 'react-use';
+
+import { FoldersListType } from './types';
+import FoldersList from './components/FolderList';
+
 
 function App() {
-  const [result, setResult] = useState<string | null>(null)
-  
+  const [storage, setStorage] = useLocalStorage<FoldersListType>('image-folders', [{ name: 'Untitled Folder', images: [] }]);
+  // TODO: move to "AddButton" component
   let uploadImageToServer = (file: File) => {
+    // TODO: refactor to use only async/await
     loadImage(
       file,
       {
@@ -16,6 +22,7 @@ function App() {
         canvas: true
       })
       .then(async (imageData: LoadImageResult) => {
+        // TODO: abstract into a separate method
         let image = imageData.image as HTMLCanvasElement
         
         let imageBase64 = image.toDataURL("image/png")
@@ -36,10 +43,17 @@ function App() {
         if (response.status >= 400 && response.status < 600) {
           throw new Error("Bad response from server");
         }
-
+        // TODO: abstract into a separate method - handle response, to improve readability
         const result = await response.json();
         const base64Result = BASE64_IMAGE_HEADER + result.result_b64
-        setResult(base64Result)
+        const updatedStorage = storage?.map((folder) => {
+          if (folder.name === "Untitled Folder") {
+            return { ...folder, images: [...folder.images, { src: base64Result }] }
+          }
+          return folder
+        })
+
+        setStorage(updatedStorage);
       })
       
       .catch(error => {
@@ -58,8 +72,8 @@ function App() {
     return (
       <div className="App">
         <header className="App-header">
-          {!result && <AddButton onImageAdd={onImageAdd}/>}
-          {result && <img src={result} width={300} alt="result from the API"/>}
+          <FoldersList setStorage={setStorage} folders={storage || []} />
+          <AddButton onImageAdd={onImageAdd} />
         </header>
       </div>
       );
